@@ -8,47 +8,50 @@ const s = {
   title: { fontSize: '28px', fontWeight: '700', color: '#1e293b', textAlign: 'center', marginBottom: '4px' },
   sub: { color: '#64748b', textAlign: 'center', marginBottom: '28px', fontSize: '14px' },
   label: { display: 'block', color: '#475569', fontSize: '13px', fontWeight: '600', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' },
-  input: { width: '100%', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '12px 16px', color: '#1e293b', fontSize: '15px', outline: 'none', marginBottom: '20px', boxSizing: 'border-box' },
-  btn: { width: '100%', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', border: 'none', borderRadius: '8px', padding: '13px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', marginBottom: '4px' },
-  oauthBtn: (borderColor, textColor) => ({
-    width: '100%',
-    background: '#ffffff',
-    color: textColor,
-    border: `1px solid ${borderColor}`,
-    borderRadius: '8px',
-    padding: '12px 16px',
-    fontSize: '13px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    cursor: 'pointer',
-    marginBottom: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.02)'
-  }),
+  input: (focused) => ({ width: '100%', background: '#f8fafc', border: `1px solid ${focused ? '#3b82f6' : '#cbd5e1'}`, borderRadius: '8px', padding: '12px 16px', color: '#1e293b', fontSize: '15px', outline: 'none', marginBottom: '8px', boxSizing: 'border-box', transition: 'border-color 0.2s' }),
+  btn: { width: '100%', background: 'linear-gradient(135deg, #10b981, #059669)', color: '#fff', border: 'none', borderRadius: '8px', padding: '13px', fontSize: '15px', fontWeight: '600', cursor: 'pointer', marginBottom: '4px', marginTop: '8px' },
+  oauthBtn: (borderColor, textColor) => ({ width: '100%', background: '#ffffff', color: textColor, border: `1px solid ${borderColor}`, borderRadius: '8px', padding: '12px 16px', fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', cursor: 'pointer', marginBottom: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }),
   logoIcon: { display: 'flex', alignItems: 'center', justifyContent: 'center', width: '20px', height: '20px' },
   err: { background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '8px', padding: '12px', color: '#ef4444', fontSize: '13px', marginBottom: '16px' },
   divider: { display: 'flex', alignItems: 'center', textAlign: 'center', color: '#94a3b8', margin: '24px 0', fontSize: '12px', fontWeight: '500' },
-  dividerLine: { content: '""', flex: 1, borderBottom: '1px solid #e2e8f0' },
-  link: { color: '#10b981', textDecoration: 'none', fontWeight: '500' },
-  qrContainer: { textAlign: 'center', margin: '20px 0' }
+  dividerLine: { flex: 1, borderBottom: '1px solid #e2e8f0' },
+  qrContainer: { textAlign: 'center', margin: '20px 0' },
+
+  // Password requirements styles
+  reqBox: { background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '14px 16px', marginBottom: '16px' },
+  reqItem: (met) => ({ display: 'flex', alignItems: 'center', gap: '10px', padding: '5px 0', fontSize: '13px', color: met ? '#15803d' : '#64748b', fontWeight: met ? '600' : '400', transition: 'all 0.2s' }),
+  reqCircle: (met) => ({ width: '20px', height: '20px', borderRadius: '50%', border: `2px solid ${met ? '#16a34a' : '#cbd5e1'}`, background: met ? '#16a34a' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.2s' }),
+  checkmark: { color: '#ffffff', fontSize: '11px', fontWeight: '700' }
 };
 
+const requirements = [
+  { key: 'length',    label: 'At least 8 characters',       test: p => p.length >= 8 },
+  { key: 'upper',     label: 'Capital letter (A-Z)',         test: p => /[A-Z]/.test(p) },
+  { key: 'lower',     label: 'Small letter (a-z)',           test: p => /[a-z]/.test(p) },
+  { key: 'number',    label: 'Number (0-9)',                 test: p => /[0-9]/.test(p) },
+  { key: 'special',   label: 'Special character (!@#$%^&*)', test: p => /[!@#$%^&*]/.test(p) },
+];
+
 export default function Register() {
-  const [form, setForm] = useState({ username: '', email: '', password: '' });
+  const [form, setForm]   = useState({ username: '', email: '', password: '' });
   const [twoFA, setTwoFA] = useState({ show: false, qrCode: '', token: '', tempToken: null });
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading]   = useState(false);
+  const [pwFocused, setPwFocused] = useState(false);
   const navigate = useNavigate();
 
+  const checks = requirements.map(r => ({ ...r, met: r.test(form.password) }));
+  const allMet = checks.every(c => c.met);
+  const showReqs = pwFocused || form.password.length > 0;
+
   const handleRegister = async () => {
+    if (!allMet) {
+      setError('Please meet all password requirements.');
+      return;
+    }
     setError(''); setLoading(true);
     try {
       const res = await API.post('/auth/register', form);
-      // خزّن الـ tempToken الجاي من الـ backend
       setTwoFA({ show: true, qrCode: res.data.qrCode, tempToken: res.data.tempToken, token: '' });
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed');
@@ -58,7 +61,6 @@ export default function Register() {
   const handleVerifyAndActivate = async () => {
     setError(''); setLoading(true);
     try {
-      // ابعت الـ tempToken في الـ Authorization header عشان الـ backend يعرف مين
       await API.post(
         '/auth/2fa/enable',
         { token: twoFA.token },
@@ -66,11 +68,12 @@ export default function Register() {
       );
       alert('Account and 2FA configured successfully! Please login.');
       navigate('/login');
-    } catch (err) {
+    } catch {
       setError('Invalid 2FA code. Please try again.');
     } finally { setLoading(false); }
   };
 
+  // ── 2FA QR Screen ──────────────────────────────────────────────────
   if (twoFA.show) return (
     <div style={s.page}>
       <div style={s.card}>
@@ -81,9 +84,11 @@ export default function Register() {
           <img src={twoFA.qrCode} alt="2FA QR" style={{ borderRadius: '8px', border: '1px solid #cbd5e1', padding: '8px', background: '#fff' }} />
         </div>
         <label style={s.label}>Verification Code</label>
-        <input style={s.input} placeholder="000000" maxLength={6} value={twoFA.token}
+        <input
+          style={s.input(false)} placeholder="000000" maxLength={6} value={twoFA.token}
           onChange={e => setTwoFA({ ...twoFA, token: e.target.value })}
-          onKeyDown={e => e.key === 'Enter' && handleVerifyAndActivate()} />
+          onKeyDown={e => e.key === 'Enter' && handleVerifyAndActivate()}
+        />
         <button style={s.btn} onClick={handleVerifyAndActivate} disabled={loading}>
           {loading ? 'Activating...' : 'Activate Account & 2FA'}
         </button>
@@ -91,6 +96,7 @@ export default function Register() {
     </div>
   );
 
+  // ── Register Form ───────────────────────────────────────────────────
   return (
     <div style={s.page}>
       <div style={s.card}>
@@ -99,24 +105,51 @@ export default function Register() {
         {error && <div style={s.err}>{error}</div>}
 
         <label style={s.label}>Username</label>
-        <input style={s.input} type="text" placeholder="Enter your username" value={form.username}
-          onChange={e => setForm({ ...form, username: e.target.value })} />
+        <input
+          style={s.input(false)} type="text" placeholder="Enter your username" value={form.username}
+          onChange={e => setForm({ ...form, username: e.target.value })}
+        />
 
         <label style={s.label}>Email</label>
-        <input style={s.input} type="email" placeholder="Enter your email" value={form.email}
-          onChange={e => setForm({ ...form, email: e.target.value })} />
+        <input
+          style={s.input(false)} type="email" placeholder="Enter your email" value={form.email}
+          onChange={e => setForm({ ...form, email: e.target.value })}
+        />
 
         <label style={s.label}>Password</label>
-        <input style={s.input} type="password" placeholder="Enter your password" value={form.password}
+        <input
+          style={s.input(pwFocused)}
+          type="password"
+          placeholder="Enter your password"
+          value={form.password}
           onChange={e => setForm({ ...form, password: e.target.value })}
-          onKeyDown={e => e.key === 'Enter' && handleRegister()} />
+          onFocus={() => setPwFocused(true)}
+          onBlur={() => setPwFocused(false)}
+          onKeyDown={e => e.key === 'Enter' && handleRegister()}
+        />
 
-        <button style={s.btn} onClick={handleRegister}>{loading ? 'Creating account...' : 'SIGN UP'}</button>
+        {/* ── Password Requirements Box ── */}
+        {showReqs && (
+          <div style={s.reqBox}>
+            {checks.map(c => (
+              <div key={c.key} style={s.reqItem(c.met)}>
+                <div style={s.reqCircle(c.met)}>
+                  {c.met && <span style={s.checkmark}>✓</span>}
+                </div>
+                {c.label}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button style={{ ...s.btn, opacity: allMet ? 1 : 0.7 }} onClick={handleRegister} disabled={loading}>
+          {loading ? 'Creating account...' : 'SIGN UP'}
+        </button>
 
         <div style={s.divider}>
-          <div style={s.dividerLine}></div>
+          <div style={s.dividerLine} />
           <span style={{ padding: '0 10px' }}>or continue with</span>
-          <div style={s.dividerLine}></div>
+          <div style={s.dividerLine} />
         </div>
 
         <button style={s.oauthBtn('#e2e8f0', '#334155')} onClick={() => window.location.href = 'https://localhost:5000/api/auth/google'}>
@@ -133,7 +166,9 @@ export default function Register() {
 
         <button style={s.oauthBtn('#e2e8f0', '#334155')} onClick={() => window.location.href = 'https://localhost:5000/api/auth/github'}>
           <div style={s.logoIcon}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="#24292e"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" /></svg>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="#24292e">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+            </svg>
           </div>
           CONTINUE WITH GITHUB
         </button>
